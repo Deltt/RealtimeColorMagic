@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta charset="UTF-8">
+  <title>Live Color Replace</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <video id="camera" autoplay playsinline></video>
+    <canvas id="output"></canvas>
+
+    <div id="controls">
+      <div class="control">
+        <label for="maskColor">Mask color</label>
+        <input type="color" id="maskColor" value="#00ff00">
+      </div>
+      <div class="control">
+        <label for="replaceColor">Replace color</label>
+        <input type="color" id="replaceColor" value="#ff00ff">
+      </div>
+      <div class="control">
+        <label for="threshold">Range</label>
+        <input type="range" id="threshold" min="0" max="1" step="0.01" value="0.2">
+      </div>
+    </div>
+  </div>
+
+  <script src="scripts.js"></script>
+</body>
+</html>
