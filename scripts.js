@@ -6,24 +6,67 @@ const maskPicker = document.getElementById("maskColor");
 const replacePicker = document.getElementById("replaceColor");
 const thresholdSlider = document.getElementById("threshold");
 
-let maskColor = hexToRGB(maskPicker.value);
-let replaceColor = hexToRGB(replacePicker.value);
+let maskHue = rgbToHsv(hexToRGB(maskPicker.value))[0];
+let replaceHue = rgbToHsv(hexToRGB(replacePicker.value))[0];
 let threshold = parseFloat(thresholdSlider.value);
 
-maskPicker.addEventListener("input", e => maskColor = hexToRGB(e.target.value));
-replacePicker.addEventListener("input", e => replaceColor = hexToRGB(e.target.value));
-thresholdSlider.addEventListener("input", e => threshold = parseFloat(e.target.value));
+maskPicker.addEventListener("input", e => {
+  maskHue = rgbToHsv(hexToRGB(e.target.value))[0];
+});
+replacePicker.addEventListener("input", e => {
+  replaceHue = rgbToHsv(hexToRGB(e.target.value))[0];
+});
+thresholdSlider.addEventListener("input", e => {
+  threshold = parseFloat(e.target.value);
+});
 
-// Convert #rrggbb → [r,g,b]
+// Convert hex → [r,g,b]
 function hexToRGB(hex) {
   const bigint = parseInt(hex.slice(1), 16);
   return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
 }
 
+// RGB <-> HSV conversions
+function rgbToHsv([r, g, b]) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const d = max - min;
+  let h = 0, s = max === 0 ? 0 : d / max, v = max;
+
+  if (d !== 0) {
+    if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h /= 6;
+  }
+  return [h, s, v];
+}
+
+function hsvToRgb([h, s, v]) {
+  let r, g, b;
+  const i = Math.floor(h * 6);
+  const f = h * 6 - i;
+  const p = v * (1 - s);
+  const q = v * (1 - f * s);
+  const t = v * (1 - (1 - f) * s);
+  switch (i % 6) {
+    case 0: r = v; g = t; b = p; break;
+    case 1: r = q; g = v; b = p; break;
+    case 2: r = p; g = v; b = t; break;
+    case 3: r = p; g = q; b = v; break;
+    case 4: r = t; g = p; b = v; break;
+    case 5: r = v; g = p; b = q; break;
+  }
+  return [r * 255, g * 255, b * 255];
+}
+
 // Start camera
 async function startCamera() {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" },
+      audio: false
+    });
     video.srcObject = stream;
     video.onloadedmetadata = () => {
       canvas.width = video.videoWidth;
@@ -35,12 +78,10 @@ async function startCamera() {
   }
 }
 
-function colorDistance(a, b) {
-  return Math.sqrt(
-    (a[0]-b[0])**2 +
-    (a[1]-b[1])**2 +
-    (a[2]-b[2])**2
-  ) / 441.67295593; // Normalize 0–1 (sqrt(255^2*3))
+// Hue difference (wrap-around)
+function hueDistance(a, b) {
+  const diff = Math.abs(a - b);
+  return Math.min(diff, 1 - diff);
 }
 
 function renderFrame() {
@@ -50,11 +91,14 @@ function renderFrame() {
 
   for (let i = 0; i < d.length; i += 4) {
     const r = d[i], g = d[i+1], b = d[i+2];
-    const dist = colorDistance([r,g,b], maskColor);
+    const hsv = rgbToHsv([r, g, b]);
+    const dist = hueDistance(hsv[0], maskHue);
+
     if (dist < threshold) {
-      d[i]   = replaceColor[0];
-      d[i+1] = replaceColor[1];
-      d[i+2] = replaceColor[2];
+      // Shift hue towards target
+      hsv[0] = replaceHue;
+      const [nr, ng, nb] = hsvToRgb(hsv);
+      d[i] = nr; d[i+1] = ng; d[i+2] = nb;
     }
   }
 
