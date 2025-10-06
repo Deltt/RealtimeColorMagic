@@ -20,13 +20,12 @@ thresholdSlider.addEventListener("input", e => {
   threshold = parseFloat(e.target.value);
 });
 
-// Convert hex → [r,g,b]
+// --- Utility conversions ---
 function hexToRGB(hex) {
   const bigint = parseInt(hex.slice(1), 16);
   return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
 }
 
-// RGB <-> HSV conversions
 function rgbToHsv([r, g, b]) {
   r /= 255; g /= 255; b /= 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b);
@@ -60,6 +59,12 @@ function hsvToRgb([h, s, v]) {
   return [r * 255, g * 255, b * 255];
 }
 
+// Hue difference, wrapping correctly
+function hueDistance(a, b) {
+  const diff = Math.abs(a - b);
+  return Math.min(diff, 1 - diff);
+}
+
 // Start camera
 async function startCamera() {
   try {
@@ -78,12 +83,7 @@ async function startCamera() {
   }
 }
 
-// Hue difference (wrap-around)
-function hueDistance(a, b) {
-  const diff = Math.abs(a - b);
-  return Math.min(diff, 1 - diff);
-}
-
+// Core: smoothly rotate hue toward target hue
 function renderFrame() {
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
   const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -95,8 +95,12 @@ function renderFrame() {
     const dist = hueDistance(hsv[0], maskHue);
 
     if (dist < threshold) {
-      // Shift hue towards target
-      hsv[0] = replaceHue;
+      const t = 1 - (dist / threshold); // blend strength (0–1)
+      // interpolate hue with wrap-around
+      let delta = replaceHue - hsv[0];
+      if (delta > 0.5) delta -= 1;
+      if (delta < -0.5) delta += 1;
+      hsv[0] = (hsv[0] + delta * t + 1) % 1;
       const [nr, ng, nb] = hsvToRgb(hsv);
       d[i] = nr; d[i+1] = ng; d[i+2] = nb;
     }
